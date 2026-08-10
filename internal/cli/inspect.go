@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/portdoctor/portdoctor/internal/framework"
-	"github.com/portdoctor/portdoctor/internal/output"
-	"github.com/portdoctor/portdoctor/internal/port"
-	"github.com/portdoctor/portdoctor/internal/process"
-	"github.com/portdoctor/portdoctor/internal/project"
-	"github.com/portdoctor/portdoctor/internal/runtime"
+	"github.com/UPin2905/portdoctor/internal/framework"
+	"github.com/UPin2905/portdoctor/internal/output"
+	"github.com/UPin2905/portdoctor/internal/port"
+	"github.com/UPin2905/portdoctor/internal/process"
+	"github.com/UPin2905/portdoctor/internal/project"
+	"github.com/UPin2905/portdoctor/internal/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -147,3 +147,4 @@ func buildDiagnosis(procName, rt, fw string, proj *project.ProjectInfo) string {
 		return fmt.Sprintf("Process: %s", procName)
 	}
 }
+

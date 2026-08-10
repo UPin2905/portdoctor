@@ -1,4 +1,4 @@
-module github.com/portdoctor/portdoctor
+module github.com/UPin2905/portdoctor
 
 go 1.26.5
 

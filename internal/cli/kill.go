@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/portdoctor/portdoctor/internal/port"
-	"github.com/portdoctor/portdoctor/internal/process"
+	"github.com/UPin2905/portdoctor/internal/port"
+	"github.com/UPin2905/portdoctor/internal/process"
 	"github.com/spf13/cobra"
 )
 
@@ -95,3 +95,4 @@ func killPlatform(pid int) error {
 	}
 	return killUnix(pid)
 }
+

@@ -5,8 +5,8 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/portdoctor/portdoctor/internal/output"
-	"github.com/portdoctor/portdoctor/internal/port"
+	"github.com/UPin2905/portdoctor/internal/output"
+	"github.com/UPin2905/portdoctor/internal/port"
 	"github.com/spf13/cobra"
 )
 
@@ -59,3 +59,4 @@ func isPortFree(p int) bool {
 	ln.Close()
 	return true
 }
+
