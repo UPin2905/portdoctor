@@ -14,7 +14,7 @@ Thank you for your interest in contributing!
 ## Development
 
 ```bash
-git clone https://github.com/portdoctor/portdoctor
+git clone https://github.com/UPin2905/portdoctor
 cd portdoctor
 go build ./cmd/portdoctor
 go test ./...
@@ -52,3 +52,4 @@ Create `internal/port/port_<os>.go` and `internal/process/process_<os>.go` with 
 - Keep changes focused
 - Include tests for new logic
 - Update documentation if needed
+

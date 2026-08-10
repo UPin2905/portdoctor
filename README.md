@@ -53,14 +53,14 @@ Suggested actions
 ### From source
 
 ```bash
-git clone https://github.com/portdoctor/portdoctor
+git clone https://github.com/UPin2905/portdoctor
 cd portdoctor
 go build -o portdoctor ./cmd/portdoctor
 ```
 
 ### Pre-built binaries
 
-Download from [Releases](https://github.com/portdoctor/portdoctor/releases).
+Download from [Releases](https://github.com/UPin2905/portdoctor/releases).
 
 ---
 
@@ -150,3 +150,4 @@ Good beginner areas: framework detection, runtime detection, OS compatibility, t
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
