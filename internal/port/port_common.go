@@ -26,10 +26,12 @@ func (p *platformInspector) Inspect(port int) (*PortInfo, error) {
 	for _, addr := range addrs {
 		ln, err := net.Listen("tcp", addr)
 		if err != nil {
+			pid := findPIDForPort(port)
 			return &PortInfo{
 				Port:     port,
 				Protocol: "tcp",
 				Address:  addr,
+				PID:      pid,
 				Status:   StatusOccupied,
 			}, nil
 		}

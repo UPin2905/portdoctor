@@ -10,6 +10,35 @@ import (
 	"strings"
 )
 
+// findPIDForPort trả về PID của process đang listen trên port, 0 nếu không tìm được.
+func findPIDForPort(port int) int {
+	out, err := exec.Command("netstat", "-ano").Output()
+	if err != nil {
+		return 0
+	}
+	target := fmt.Sprintf(":%d", port)
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "TCP") {
+			continue
+		}
+		fields := strings.Fields(line)
+		// TCP  0.0.0.0:3306  0.0.0.0:0  LISTENING  1234
+		if len(fields) < 5 {
+			continue
+		}
+		if !strings.EqualFold(fields[3], "LISTENING") {
+			continue
+		}
+		localAddr := fields[1]
+		if strings.HasSuffix(localAddr, target) {
+			pid, _ := strconv.Atoi(fields[4])
+			return pid
+		}
+	}
+	return 0
+}
+
 func listListeningPlatform() ([]*PortInfo, error) {
 	out, err := exec.Command("netstat", "-ano").Output()
 	if err != nil {

@@ -6,12 +6,27 @@ import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
+
+// findPIDForPort trả về PID của process đang listen trên port, 0 nếu không tìm được.
+func findPIDForPort(port int) int {
+	for _, procFile := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
+		entries, err := parseProcNetTCP(procFile)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.Port == port && e.PID > 0 {
+				return e.PID
+			}
+		}
+	}
+	return 0
+}
 
 func listListeningPlatform() ([]*PortInfo, error) {
 	var results []*PortInfo
@@ -47,7 +62,6 @@ func parseProcNetTCP(path string) ([]*PortInfo, error) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		fields := strings.Fields(line)
-		// sl local_address rem_address st tx_queue rx_queue ... uid ... inode
 		if len(fields) < 10 {
 			continue
 		}
@@ -107,6 +121,3 @@ func findPIDByInode(inode string) int {
 	}
 	return 0
 }
-
-// Suppress unused import warning
-var _ = net.SplitHostPort

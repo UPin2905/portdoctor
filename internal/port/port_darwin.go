@@ -10,6 +10,25 @@ import (
 	"strings"
 )
 
+// findPIDForPort trả về PID của process đang listen trên port, 0 nếu không tìm được.
+func findPIDForPort(port int) int {
+	out, err := exec.Command("lsof",
+		fmt.Sprintf("-iTCP:%d", port), "-sTCP:LISTEN", "-n", "-P", "-F", "p").Output()
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "p") {
+			pid, err := strconv.Atoi(line[1:])
+			if err == nil {
+				return pid
+			}
+		}
+	}
+	return 0
+}
+
 func listListeningPlatform() ([]*PortInfo, error) {
 	out, err := exec.Command("lsof", "-iTCP", "-sTCP:LISTEN", "-n", "-P").Output()
 	if err != nil {
@@ -27,14 +46,12 @@ func parseLsofDarwin(output string) []*PortInfo {
 			continue // skip header
 		}
 		fields := strings.Fields(line)
-		// COMMAND PID USER ... NAME
 		if len(fields) < 9 {
 			continue
 		}
-		nameField := fields[8] // e.g. *:3000 or 127.0.0.1:3000
+		nameField := fields[8]
 		_, portStr, err := net.SplitHostPort(nameField)
 		if err != nil {
-			// Try replacing * with 0.0.0.0
 			nameField = strings.Replace(nameField, "*:", "0.0.0.0:", 1)
 			_, portStr, err = net.SplitHostPort(nameField)
 			if err != nil {
