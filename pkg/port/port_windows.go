@@ -8,11 +8,14 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 // findPIDForPort trả về PID của process đang listen trên port, 0 nếu không tìm được.
 func findPIDForPort(port int) int {
-	out, err := exec.Command("netstat", "-ano").Output()
+	cmd := exec.Command("netstat", "-ano")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
 	if err != nil {
 		return 0
 	}
@@ -40,7 +43,9 @@ func findPIDForPort(port int) int {
 }
 
 func listListeningPlatform() ([]*PortInfo, error) {
-	out, err := exec.Command("netstat", "-ano").Output()
+	cmd := exec.Command("netstat", "-ano")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("netstat failed: %w", err)
 	}

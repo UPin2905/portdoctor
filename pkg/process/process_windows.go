@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -26,7 +27,9 @@ func getPlatformProcess(pid int) (*ProcessInfo, error) {
 }
 
 func fillFromTasklist(info *ProcessInfo) error {
-	out, err := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", info.PID), "/FO", "CSV", "/NH").Output()
+	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", info.PID), "/FO", "CSV", "/NH")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
 	if err != nil {
 		return err
 	}
@@ -44,9 +47,11 @@ func fillFromTasklist(info *ProcessInfo) error {
 
 func fillFromWMIC(info *ProcessInfo) {
 	// CommandLine
-	out, err := exec.Command("wmic", "process", "where",
+	cmd1 := exec.Command("wmic", "process", "where",
 		fmt.Sprintf("ProcessId=%d", info.PID),
-		"get", "CommandLine,ExecutablePath,ParentProcessId,CreationDate", "/FORMAT:CSV").Output()
+		"get", "CommandLine,ExecutablePath,ParentProcessId,CreationDate", "/FORMAT:CSV")
+	cmd1.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd1.Output()
 	if err != nil {
 		return
 	}
@@ -74,16 +79,20 @@ func fillFromWMIC(info *ProcessInfo) {
 	}
 
 	// WorkingDir — lấy qua PowerShell vì WMIC không có trực tiếp
-	out, err = exec.Command("powershell", "-NoProfile", "-Command",
-		fmt.Sprintf("(Get-Process -Id %d).Path | Split-Path", info.PID)).Output()
+	cmd2 := exec.Command("powershell", "-NoProfile", "-Command",
+		fmt.Sprintf("(Get-Process -Id %d).Path | Split-Path", info.PID))
+	cmd2.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err = cmd2.Output()
 	if err == nil {
 		info.WorkingDir = strings.TrimSpace(string(out))
 	}
 
 	// Parent name
 	if info.ParentPID > 0 {
-		parentOut, err := exec.Command("tasklist", "/FI",
-			fmt.Sprintf("PID eq %d", info.ParentPID), "/FO", "CSV", "/NH").Output()
+		cmd3 := exec.Command("tasklist", "/FI",
+			fmt.Sprintf("PID eq %d", info.ParentPID), "/FO", "CSV", "/NH")
+		cmd3.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		parentOut, err := cmd3.Output()
 		if err == nil {
 			pLine := strings.TrimSpace(string(parentOut))
 			pParts := strings.Split(pLine, ",")

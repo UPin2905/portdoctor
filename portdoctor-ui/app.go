@@ -6,6 +6,7 @@ import (
 	"net"
 	"os/exec"
 	"runtime"
+	"syscall"
 
 	"github.com/UPin2905/portdoctor/pkg/port"
 	"github.com/UPin2905/portdoctor/pkg/process"
@@ -82,7 +83,9 @@ func (a *App) KillPort(p int) error {
 	}
 
 	if runtime.GOOS == "windows" {
-		return exec.Command("taskkill", "/F", "/PID", fmt.Sprintf("%d", info.PID)).Run()
+		cmd := exec.Command("taskkill", "/F", "/PID", fmt.Sprintf("%d", info.PID))
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		return cmd.Run()
 	}
 	return exec.Command("kill", "-9", fmt.Sprintf("%d", info.PID)).Run()
 }
