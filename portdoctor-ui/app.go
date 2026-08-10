@@ -26,6 +26,7 @@ type App struct {
 	ctx           context.Context
 	sharedTunnels map[int]*exec.Cmd
 	tunnelMutex   sync.Mutex
+	ruleEngine    *RuleEngine
 }
 
 // UIPortInfo extends port.PortInfo with UI-specific fields
@@ -42,9 +43,11 @@ type UIPortInfo struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{
+	a := &App{
 		sharedTunnels: make(map[int]*exec.Cmd),
 	}
+	a.ruleEngine = NewRuleEngine(a)
+	return a
 }
 
 // startup is called when the app starts. The context is saved
@@ -175,6 +178,15 @@ func (a *App) InspectPort(p int) (*port.PortInfo, error) {
 
 // KillPort kills the process using a specific port
 func (a *App) KillPort(p int) error {
+	if a.ruleEngine != nil {
+		a.ruleEngine.mutex.Lock()
+		if rule, exists := a.ruleEngine.rules[p]; exists && rule.Protected {
+			a.ruleEngine.mutex.Unlock()
+			return fmt.Errorf("port %d is protected by a rule", p)
+		}
+		a.ruleEngine.mutex.Unlock()
+	}
+
 	inspector := port.NewInspector()
 	info, err := inspector.Inspect(p)
 	if err != nil {
@@ -283,4 +295,46 @@ func (a *App) StopSharePort(portNum int) error {
 	}
 	delete(a.sharedTunnels, portNum)
 	return nil
+}
+
+// ProcessDetails contains detailed information about a process
+type ProcessDetails struct {
+	PID      int               `json:"pid"`
+	Name     string            `json:"name"`
+	Cmdline  []string          `json:"cmdline"`
+	EnvVars  map[string]string `json:"envVars"`
+	Cwd      string            `json:"cwd"`
+	Username string            `json:"username"`
+}
+
+// GetProcessDetails fetches detailed info like Env Vars and Cmdline for a PID
+func (a *App) GetProcessDetails(pid int) (*ProcessDetails, error) {
+	if pid <= 0 {
+		return nil, fmt.Errorf("invalid PID")
+	}
+
+	p, err := gopsProcess.NewProcess(int32(pid))
+	if err != nil {
+		return nil, fmt.Errorf("could not find process: %w", err)
+	}
+
+	details := &ProcessDetails{
+		PID:     pid,
+		EnvVars: make(map[string]string),
+	}
+
+	details.Name, _ = p.Name()
+	details.Cwd, _ = p.Cwd()
+	details.Cmdline, _ = p.CmdlineSlice()
+	details.Username, _ = p.Username()
+
+	env, _ := p.Environ()
+	for _, e := range env {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			details.EnvVars[parts[0]] = parts[1]
+		}
+	}
+
+	return details, nil
 }

@@ -1,20 +1,33 @@
 import { useState, useEffect } from 'react';
-import { ScanPorts, KillPort, SharePort, StopSharePort } from '../wailsjs/go/main/App';
+import { ScanPorts, KillPort, SharePort, StopSharePort, GetProcessDetails, GetRules, SaveRule, DeleteRule, StartProxy, StopProxy } from '../wailsjs/go/main/App';
 import { main } from '../wailsjs/go/models';
+import { ProcessDetailsModal } from './components/ProcessDetails';
+import { TrafficInspectorModal } from './components/TrafficInspector';
+import { RuleConfigModal } from './components/RuleConfig';
 
 function App() {
   const [ports, setPorts] = useState<main.UIPortInfo[]>([]);
+  const [rules, setRules] = useState<Record<number, main.PortRule>>({});
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [sharing, setSharing] = useState<Record<number, boolean>>({});
+  
+  // Modals state
+  const [viewingProcess, setViewingProcess] = useState<main.ProcessDetails | null>(null);
+  const [inspectingPort, setInspectingPort] = useState<{port: number, proxyPort: number} | null>(null);
+  const [configuringRuleForPort, setConfiguringRuleForPort] = useState<number | null>(null);
 
   const loadPorts = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await ScanPorts();
+      const [result, currentRules] = await Promise.all([
+        ScanPorts(),
+        GetRules()
+      ]);
       setPorts(result.sort((a, b) => a.port - b.port));
+      setRules(currentRules);
     } catch (err: any) {
       setError(err.toString());
     } finally {
@@ -25,6 +38,44 @@ function App() {
   useEffect(() => {
     loadPorts();
   }, []);
+
+  const handleInspectProcess = async (pid: number) => {
+    try {
+      const details = await GetProcessDetails(pid);
+      setViewingProcess(details);
+    } catch (err: any) {
+      alert("Error getting process details: " + err);
+    }
+  };
+
+  const handleStartProxy = async (port: number) => {
+    try {
+      const proxyPort = await StartProxy(port);
+      setInspectingPort({ port, proxyPort });
+    } catch (err: any) {
+      alert("Error starting traffic inspector: " + err);
+    }
+  };
+
+  const handleSaveRule = async (rule: main.PortRule) => {
+    try {
+      await SaveRule(rule);
+      await loadPorts();
+      setConfiguringRuleForPort(null);
+    } catch (err: any) {
+      alert("Error saving rule: " + err);
+    }
+  };
+
+  const handleDeleteRule = async (port: number) => {
+    try {
+      await DeleteRule(port);
+      await loadPorts();
+      setConfiguringRuleForPort(null);
+    } catch (err: any) {
+      alert("Error deleting rule: " + err);
+    }
+  };
 
   const handleKill = async (p: number) => {
     if (!window.confirm(`Are you sure you want to kill the process on port ${p}?`)) return;
@@ -159,7 +210,17 @@ function App() {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-200">{p.processName || '-'}</span>
-                        <span className="text-xs text-gray-500">PID: {p.pid > 0 ? p.pid : '-'}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-gray-500">PID: {p.pid > 0 ? p.pid : '-'}</span>
+                          {p.pid > 0 && (
+                            <button
+                              onClick={() => handleInspectProcess(p.pid)}
+                              className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 decoration-blue-500/30"
+                            >
+                              Details
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -198,45 +259,70 @@ function App() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       {p.status === 'OCCUPIED' && (
-                        <div className="flex items-center justify-end gap-2 flex-wrap max-w-[250px] ml-auto">
-                          {p.sharedUrl ? (
-                            <div className="flex flex-col items-end gap-1">
-                              <a href={p.sharedUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2">
-                                {p.sharedUrl.replace('https://', '')}
-                              </a>
-                              <button
-                                onClick={() => handleStopShare(p.port)}
-                                className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white rounded-md transition-all border border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.5)] text-xs font-medium"
-                              >
-                                Stop Share
-                              </button>
-                            </div>
-                          ) : (
+                        <div className="flex flex-col gap-2 items-end">
+                          <div className="flex items-center justify-end gap-2 flex-wrap max-w-[300px]">
                             <button
-                              onClick={() => handleShare(p.port)}
-                              disabled={sharing[p.port]}
-                              className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-md transition-all border border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
+                              onClick={() => handleStartProxy(p.port)}
+                              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-md transition-all border border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] text-xs font-medium"
                             >
-                              {sharing[p.port] ? (
-                                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                                </svg>
-                              )}
-                              Share
+                              Inspect
                             </button>
-                          )}
-                          <button
-                            onClick={() => handleKill(p.port)}
-                            className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-md transition-all border border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] text-xs font-medium"
-                          >
-                            Kill
-                          </button>
+                            <button
+                              onClick={() => setConfiguringRuleForPort(p.port)}
+                              className={`px-3 py-1.5 rounded-md transition-all border text-xs font-medium flex items-center gap-1 ${
+                                rules[p.port] 
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]' 
+                                : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600'
+                              }`}
+                            >
+                              Rules {rules[p.port]?.protected && '🛡️'}
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 flex-wrap max-w-[300px]">
+                            {p.sharedUrl ? (
+                              <div className="flex items-center gap-2">
+                                <a href={p.sharedUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2">
+                                  {p.sharedUrl.replace('https://', '')}
+                                </a>
+                                <button
+                                  onClick={() => handleStopShare(p.port)}
+                                  className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white rounded-md transition-all border border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.5)] text-xs font-medium"
+                                >
+                                  Stop Share
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleShare(p.port)}
+                                disabled={sharing[p.port]}
+                                className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-md transition-all border border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                {sharing[p.port] ? (
+                                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                  </svg>
+                                )}
+                                Share
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleKill(p.port)}
+                              disabled={rules[p.port]?.protected}
+                              className={`px-3 py-1.5 rounded-md transition-all border text-xs font-medium ${
+                                rules[p.port]?.protected
+                                ? 'bg-gray-700/50 text-gray-500 border-gray-700 cursor-not-allowed'
+                                : 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                              }`}
+                            >
+                              Kill
+                            </button>
+                          </div>
                         </div>
                       )}
                     </td>
@@ -247,6 +333,33 @@ function App() {
           </table>
         </div>
       </div>
+
+      {/* Modals */}
+      <ProcessDetailsModal 
+        details={viewingProcess} 
+        onClose={() => setViewingProcess(null)} 
+      />
+      
+      {inspectingPort && (
+        <TrafficInspectorModal 
+          port={inspectingPort.port} 
+          proxyPort={inspectingPort.proxyPort} 
+          onClose={() => {
+            StopProxy(inspectingPort.port);
+            setInspectingPort(null);
+          }} 
+        />
+      )}
+
+      {configuringRuleForPort !== null && (
+        <RuleConfigModal 
+          port={configuringRuleForPort} 
+          existingRule={rules[configuringRuleForPort]}
+          onSave={handleSaveRule}
+          onDelete={handleDeleteRule}
+          onClose={() => setConfiguringRuleForPort(null)} 
+        />
+      )}
     </div>
   );
 }
