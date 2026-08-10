@@ -6,6 +6,7 @@ import (
 	"net"
 	"os/exec"
 	"runtime"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -142,9 +143,19 @@ func (a *App) KillPort(p int) error {
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command("taskkill", "/F", "/PID", fmt.Sprintf("%d", info.PID))
 		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-		return cmd.Run()
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+		}
+		return nil
 	}
-	return exec.Command("kill", "-9", fmt.Sprintf("%d", info.PID)).Run()
+	
+	cmd := exec.Command("kill", "-9", fmt.Sprintf("%d", info.PID))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // FindFreePort finds a free port starting from a base port
