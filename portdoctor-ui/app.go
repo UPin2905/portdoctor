@@ -8,11 +8,20 @@ import (
 	"runtime"
 
 	"github.com/UPin2905/portdoctor/pkg/port"
+	"github.com/UPin2905/portdoctor/pkg/process"
 )
 
 // App struct
 type App struct {
 	ctx context.Context
+}
+
+// UIPortInfo extends port.PortInfo with UI-specific fields
+type UIPortInfo struct {
+	Port        int    `json:"port"`
+	Status      string `json:"status"`
+	PID         int    `json:"pid"`
+	ProcessName string `json:"processName"`
 }
 
 // NewApp creates a new App application struct
@@ -26,10 +35,33 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// ScanPorts returns all listening ports
-func (a *App) ScanPorts() ([]*port.PortInfo, error) {
+// ScanPorts returns all listening ports with process names
+func (a *App) ScanPorts() ([]UIPortInfo, error) {
 	inspector := port.NewInspector()
-	return inspector.ListListening()
+	ports, err := inspector.ListListening()
+	if err != nil {
+		return nil, err
+	}
+
+	var results []UIPortInfo
+	for _, p := range ports {
+		uiInfo := UIPortInfo{
+			Port:   p.Port,
+			Status: string(p.Status),
+			PID:    p.PID,
+		}
+
+		if p.PID > 0 {
+			proc, err := process.GetProcess(p.PID)
+			if err == nil && proc != nil {
+				uiInfo.ProcessName = proc.Name
+			}
+		}
+		
+		results = append(results, uiInfo)
+	}
+
+	return results, nil
 }
 
 // InspectPort inspects a specific port

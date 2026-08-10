@@ -1,3 +1,26 @@
+export namespace main {
+	
+	export class UIPortInfo {
+	    port: number;
+	    status: string;
+	    pid: number;
+	    processName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UIPortInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.status = source["status"];
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
+	    }
+	}
+
+}
+
 export namespace port {
 	
 	export class PortInfo {
