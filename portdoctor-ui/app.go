@@ -6,9 +6,8 @@ import (
 	"net"
 	"os/exec"
 	"runtime"
-	"strconv"
-	"strings"
 	"syscall"
+	"unsafe"
 
 	"github.com/UPin2905/portdoctor/pkg/port"
 	"github.com/UPin2905/portdoctor/pkg/process"
@@ -80,24 +79,34 @@ func (a *App) getProcessNames(pids []int) map[int]string {
 	names := make(map[int]string)
 	
 	if runtime.GOOS == "windows" {
-		cmd := exec.Command("tasklist", "/FO", "CSV", "/NH")
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-		out, err := cmd.Output()
-		if err == nil {
-			lines := strings.Split(string(out), "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if line == "" {
-					continue
+		snapshot, err := syscall.CreateToolhelp32Snapshot(syscall.TH32CS_SNAPPROCESS, 0)
+		if err != nil {
+			return names
+		}
+		defer syscall.CloseHandle(snapshot)
+
+		var procEntry syscall.ProcessEntry32
+		procEntry.Size = uint32(unsafe.Sizeof(procEntry))
+
+		err = syscall.Process32First(snapshot, &procEntry)
+		if err != nil {
+			return names
+		}
+
+		for {
+			var buf []uint16
+			for _, v := range procEntry.ExeFile {
+				if v == 0 {
+					break
 				}
-				parts := strings.Split(line, ",")
-				if len(parts) >= 2 {
-					name := strings.Trim(parts[0], `"`)
-					pidStr := strings.Trim(parts[1], `"`)
-					if pid, err := strconv.Atoi(pidStr); err == nil {
-						names[pid] = name
-					}
-				}
+				buf = append(buf, v)
+			}
+			name := syscall.UTF16ToString(buf)
+			names[int(procEntry.ProcessID)] = name
+
+			err = syscall.Process32Next(snapshot, &procEntry)
+			if err != nil {
+				break
 			}
 		}
 		return names
