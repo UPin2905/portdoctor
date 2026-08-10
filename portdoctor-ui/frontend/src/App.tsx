@@ -4,6 +4,7 @@ import { main } from '../wailsjs/go/models';
 import { ProcessDetailsModal } from './components/ProcessDetails';
 import { TrafficInspectorModal } from './components/TrafficInspector';
 import { RuleConfigModal } from './components/RuleConfig';
+import { HelpGuideModal } from './components/HelpGuide';
 
 function App() {
   const [ports, setPorts] = useState<main.UIPortInfo[]>([]);
@@ -14,6 +15,7 @@ function App() {
   const [sharing, setSharing] = useState<Record<number, boolean>>({});
   
   // Modals state
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [viewingProcess, setViewingProcess] = useState<main.ProcessDetails | null>(null);
   const [inspectingPort, setInspectingPort] = useState<{port: number, proxyPort: number} | null>(null);
   const [configuringRuleForPort, setConfiguringRuleForPort] = useState<number | null>(null);
@@ -138,12 +140,20 @@ function App() {
             </h1>
             <p className="text-gray-400 mt-2">Visual Port Management Interface</p>
           </div>
-          <button
-            onClick={loadPorts}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center shadow-lg shadow-blue-500/30"
-          >
-            {loading ? 'Scanning...' : '🔄 Refresh'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowHelpGuide(true)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors flex items-center gap-2 border border-gray-600"
+            >
+              ℹ️ Guide
+            </button>
+            <button
+              onClick={loadPorts}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center shadow-lg shadow-blue-500/30"
+            >
+              {loading ? 'Scanning...' : '🔄 Refresh'}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -359,6 +369,10 @@ function App() {
           onDelete={handleDeleteRule}
           onClose={() => setConfiguringRuleForPort(null)} 
         />
+      )}
+
+      {showHelpGuide && (
+        <HelpGuideModal onClose={() => setShowHelpGuide(false)} />
       )}
     </div>
   );
