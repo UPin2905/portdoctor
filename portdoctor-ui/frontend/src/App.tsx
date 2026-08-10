@@ -78,8 +78,8 @@ function App() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 p-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-4 md:p-8">
+      <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -122,7 +122,7 @@ function App() {
           )}
         </div>
 
-        <div className="bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700">
+        <div className="bg-gray-800 rounded-xl shadow-xl overflow-x-auto border border-gray-700">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-800/50 text-gray-400 uppercase text-xs tracking-wider border-b border-gray-700">
