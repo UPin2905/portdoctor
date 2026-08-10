@@ -5,6 +5,10 @@ export namespace main {
 	    status: string;
 	    pid: number;
 	    processName: string;
+	    project: string;
+	    cpu: number;
+	    ram: number;
+	    sharedUrl: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new UIPortInfo(source);
@@ -16,6 +20,10 @@ export namespace main {
 	        this.status = source["status"];
 	        this.pid = source["pid"];
 	        this.processName = source["processName"];
+	        this.project = source["project"];
+	        this.cpu = source["cpu"];
+	        this.ram = source["ram"];
+	        this.sharedUrl = source["sharedUrl"];
 	    }
 	}
 

@@ -10,3 +10,7 @@ export function InspectPort(arg1:number):Promise<port.PortInfo>;
 export function KillPort(arg1:number):Promise<void>;
 
 export function ScanPorts():Promise<Array<main.UIPortInfo>>;
+
+export function SharePort(arg1:number):Promise<string>;
+
+export function StopSharePort(arg1:number):Promise<void>;

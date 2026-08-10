@@ -17,3 +17,11 @@ export function KillPort(arg1) {
 export function ScanPorts() {
   return window['go']['main']['App']['ScanPorts']();
 }
+
+export function SharePort(arg1) {
+  return window['go']['main']['App']['SharePort'](arg1);
+}
+
+export function StopSharePort(arg1) {
+  return window['go']['main']['App']['StopSharePort'](arg1);
+}

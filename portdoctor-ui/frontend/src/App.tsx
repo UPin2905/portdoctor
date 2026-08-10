@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ScanPorts, KillPort } from '../wailsjs/go/main/App';
+import { ScanPorts, KillPort, SharePort, StopSharePort } from '../wailsjs/go/main/App';
 import { main } from '../wailsjs/go/models';
 
 function App() {
@@ -7,6 +7,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
+  const [sharing, setSharing] = useState<Record<number, boolean>>({});
 
   const loadPorts = async () => {
     setLoading(true);
@@ -35,12 +36,44 @@ function App() {
     }
   };
 
+  const handleShare = async (p: number) => {
+    setSharing(prev => ({...prev, [p]: true}));
+    try {
+      await SharePort(p);
+      await loadPorts();
+    } catch (err: any) {
+      alert("Error sharing port: " + err);
+    } finally {
+      setSharing(prev => ({...prev, [p]: false}));
+    }
+  };
+
+  const handleStopShare = async (p: number) => {
+    try {
+      await StopSharePort(p);
+      await loadPorts();
+    } catch (err: any) {
+      alert("Error stopping share: " + err);
+    }
+  };
+
+  const formatMem = (bytes: number) => {
+    if (!bytes) return '-';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  };
+
+  const formatCPU = (pct: number) => {
+    if (!pct) return '-';
+    return pct.toFixed(1) + '%';
+  };
+
   const filteredPorts = ports.filter(p => {
     const s = search.toLowerCase();
     return (
       p.port.toString().includes(s) ||
       (p.status || '').toLowerCase().includes(s) ||
-      (p.processName || '').toLowerCase().includes(s)
+      (p.processName || '').toLowerCase().includes(s) ||
+      (p.project || '').toLowerCase().includes(s)
     );
   });
 
@@ -96,14 +129,15 @@ function App() {
                 <th className="px-6 py-4 font-medium">Port</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Process</th>
-                <th className="px-6 py-4 font-medium">PID</th>
+                <th className="px-6 py-4 font-medium">Project</th>
+                <th className="px-6 py-4 font-medium">Resources</th>
                 <th className="px-6 py-4 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
               {filteredPorts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     No ports found
                   </td>
                 </tr>
@@ -123,19 +157,87 @@ function App() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-medium text-gray-200">{p.processName || '-'}</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-200">{p.processName || '-'}</span>
+                        <span className="text-xs text-gray-500">PID: {p.pid > 0 ? p.pid : '-'}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-mono text-gray-400">{p.pid > 0 ? p.pid : '-'}</span>
+                      {p.project ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium text-sm">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 6a2 2 0 012-2h5.586a1 1 0 01.707.293l2.828 2.828a1 1 0 00.707.293H16a2 2 0 012 2v5a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                          </svg>
+                          {p.project}
+                        </span>
+                      ) : (
+                        <span className="text-gray-600">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {p.pid > 0 ? (
+                        <div className="flex flex-col gap-1 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500 w-8">CPU</span>
+                            <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(p.cpu || 0, 100)}%` }} />
+                            </div>
+                            <span className="text-gray-400">{formatCPU(p.cpu)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500 w-8">RAM</span>
+                            <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min((p.ram || 0) / 1024 / 1024 / 16, 100)}%` }} />
+                            </div>
+                            <span className="text-gray-400">{formatMem(p.ram)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-600">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       {p.status === 'OCCUPIED' && (
-                        <button
-                          onClick={() => handleKill(p.port)}
-                          className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-md transition-all border border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
-                        >
-                          Kill Process
-                        </button>
+                        <div className="flex items-center justify-end gap-2 flex-wrap max-w-[250px] ml-auto">
+                          {p.sharedUrl ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <a href={p.sharedUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2">
+                                {p.sharedUrl.replace('https://', '')}
+                              </a>
+                              <button
+                                onClick={() => handleStopShare(p.port)}
+                                className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white rounded-md transition-all border border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.5)] text-xs font-medium"
+                              >
+                                Stop Share
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleShare(p.port)}
+                              disabled={sharing[p.port]}
+                              className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-md transition-all border border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              {sharing[p.port] ? (
+                                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                </svg>
+                              )}
+                              Share
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleKill(p.port)}
+                            className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-md transition-all border border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] text-xs font-medium"
+                          >
+                            Kill
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
