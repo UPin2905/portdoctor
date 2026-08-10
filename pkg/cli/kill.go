@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/UPin2905/portdoctor/internal/port"
-	"github.com/UPin2905/portdoctor/internal/process"
+	"github.com/UPin2905/portdoctor/pkg/port"
+	"github.com/UPin2905/portdoctor/pkg/process"
 	"github.com/spf13/cobra"
 )
 

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/UPin2905/portdoctor/internal/framework"
-	"github.com/UPin2905/portdoctor/internal/output"
-	"github.com/UPin2905/portdoctor/internal/port"
-	"github.com/UPin2905/portdoctor/internal/process"
-	"github.com/UPin2905/portdoctor/internal/project"
-	"github.com/UPin2905/portdoctor/internal/runtime"
+	"github.com/UPin2905/portdoctor/pkg/framework"
+	"github.com/UPin2905/portdoctor/pkg/output"
+	"github.com/UPin2905/portdoctor/pkg/port"
+	"github.com/UPin2905/portdoctor/pkg/process"
+	"github.com/UPin2905/portdoctor/pkg/project"
+	"github.com/UPin2905/portdoctor/pkg/runtime"
 	"github.com/spf13/cobra"
 )
 

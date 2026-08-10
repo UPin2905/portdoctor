@@ -5,8 +5,8 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/UPin2905/portdoctor/internal/output"
-	"github.com/UPin2905/portdoctor/internal/port"
+	"github.com/UPin2905/portdoctor/pkg/output"
+	"github.com/UPin2905/portdoctor/pkg/port"
 	"github.com/spf13/cobra"
 )
 
