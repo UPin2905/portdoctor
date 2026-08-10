@@ -6,6 +6,8 @@ import (
 	"net"
 	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/UPin2905/portdoctor/pkg/port"
@@ -45,6 +47,15 @@ func (a *App) ScanPorts() ([]UIPortInfo, error) {
 	}
 
 	var results []UIPortInfo
+	pids := make([]int, 0)
+	for _, p := range ports {
+		if p.PID > 0 {
+			pids = append(pids, p.PID)
+		}
+	}
+
+	names := a.getProcessNames(pids)
+
 	for _, p := range ports {
 		uiInfo := UIPortInfo{
 			Port:   p.Port,
@@ -53,9 +64,8 @@ func (a *App) ScanPorts() ([]UIPortInfo, error) {
 		}
 
 		if p.PID > 0 {
-			proc, err := process.GetProcess(p.PID)
-			if err == nil && proc != nil {
-				uiInfo.ProcessName = proc.Name
+			if name, ok := names[p.PID]; ok {
+				uiInfo.ProcessName = name
 			}
 		}
 		
@@ -63,6 +73,44 @@ func (a *App) ScanPorts() ([]UIPortInfo, error) {
 	}
 
 	return results, nil
+}
+
+// getProcessNames efficiently fetches names for a list of PIDs
+func (a *App) getProcessNames(pids []int) map[int]string {
+	names := make(map[int]string)
+	
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command("tasklist", "/FO", "CSV", "/NH")
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		out, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(out), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				parts := strings.Split(line, ",")
+				if len(parts) >= 2 {
+					name := strings.Trim(parts[0], `"`)
+					pidStr := strings.Trim(parts[1], `"`)
+					if pid, err := strconv.Atoi(pidStr); err == nil {
+						names[pid] = name
+					}
+				}
+			}
+		}
+		return names
+	}
+
+	// Fallback for other OSes
+	for _, pid := range pids {
+		proc, err := process.GetProcess(pid)
+		if err == nil && proc != nil {
+			names[pid] = proc.Name
+		}
+	}
+	return names
 }
 
 // InspectPort inspects a specific port
