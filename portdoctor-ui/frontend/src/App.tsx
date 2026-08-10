@@ -79,7 +79,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-4 md:p-8">
-      <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
+      <div className="w-full h-full mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
