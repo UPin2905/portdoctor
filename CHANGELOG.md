@@ -2,6 +2,12 @@
 
 All notable changes to PortDoctor are documented here.
 
+## v0.1.1 - 2026-08-11
+
+### Fixed
+
+- Build the desktop frontend before testing the Wails backend in CI.
+
 ## v0.1.0 - 2026-08-11
 
 ### Added

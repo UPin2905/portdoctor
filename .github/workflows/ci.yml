@@ -55,12 +55,12 @@ jobs:
           cache: npm
           cache-dependency-path: portdoctor-ui/frontend/package-lock.json
 
-      - name: Test desktop backend
-        working-directory: portdoctor-ui
-        run: go test ./...
-
       - name: Build desktop frontend
         working-directory: portdoctor-ui/frontend
         run: |
           npm ci
           npm run build
+
+      - name: Test desktop backend
+        working-directory: portdoctor-ui
+        run: go test ./...
