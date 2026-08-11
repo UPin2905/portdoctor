@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Test (${{ matrix.os }})
+  cli:
+    name: CLI (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -20,12 +20,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.26.5'
 
       - name: Format check
         run: |
-          gofmt -l .
-          test -z "$(gofmt -l .)"
+          test -z "$(gofmt -l $(git ls-files '*.go'))"
         shell: bash
 
       - name: Vet
@@ -36,3 +35,32 @@ jobs:
 
       - name: Build
         run: go build ./cmd/portdoctor
+
+  desktop:
+    name: Desktop UI
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.5'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portdoctor-ui/frontend/package-lock.json
+
+      - name: Test desktop backend
+        working-directory: portdoctor-ui
+        run: go test ./...
+
+      - name: Build desktop frontend
+        working-directory: portdoctor-ui/frontend
+        run: |
+          npm ci
+          npm run build

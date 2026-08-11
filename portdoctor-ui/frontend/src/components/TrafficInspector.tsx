@@ -80,6 +80,7 @@ export const TrafficInspectorModal: React.FC<TrafficInspectorProps> = ({ port, p
                         <p className="text-gray-400 text-sm mt-1">
                             Listening on proxy port <span className="text-white font-mono">{proxyPort}</span> ➔ Forwarding to <span className="text-white font-mono">{port}</span>
                         </p>
+                        <p className="text-amber-300 text-xs mt-1">Sensitive headers are redacted. Request and response bodies can still contain private data.</p>
                     </div>
                     <div className="flex gap-4">
                         <button onClick={() => setLogs([])} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm text-white">Clear</button>

@@ -147,4 +147,3 @@ func buildDiagnosis(procName, rt, fw string, proj *project.ProjectInfo) string {
 		return fmt.Sprintf("Process: %s", procName)
 	}
 }
-

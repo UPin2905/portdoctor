@@ -27,6 +27,8 @@ type RuleEngine struct {
 	mutex         sync.Mutex
 	rulesFilePath string
 	healCooldowns map[int]time.Time
+	stop          chan struct{}
+	stopOnce      sync.Once
 }
 
 func NewRuleEngine(app *App) *RuleEngine {
@@ -39,6 +41,7 @@ func NewRuleEngine(app *App) *RuleEngine {
 		rules:         make(map[int]PortRule),
 		rulesFilePath: filepath.Join(rulesDir, "rules.json"),
 		healCooldowns: make(map[int]time.Time),
+		stop:          make(chan struct{}),
 	}
 	re.LoadRules()
 	go re.StartWatcher()
@@ -55,21 +58,26 @@ func (re *RuleEngine) LoadRules() {
 	}
 }
 
-func (re *RuleEngine) SaveRules() {
-	data, _ := json.MarshalIndent(re.rules, "", "  ")
-	os.WriteFile(re.rulesFilePath, data, 0644)
+func (re *RuleEngine) SaveRules() error {
+	data, err := json.MarshalIndent(re.rules, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(re.rulesFilePath, data, 0644)
 }
 
 func (a *App) SaveRule(rule PortRule) error {
 	if a.ruleEngine == nil {
 		return fmt.Errorf("rule engine not initialized")
 	}
+	if err := port.ValidatePort(rule.Port); err != nil {
+		return err
+	}
 	a.ruleEngine.mutex.Lock()
 	defer a.ruleEngine.mutex.Unlock()
 
 	a.ruleEngine.rules[rule.Port] = rule
-	a.ruleEngine.SaveRules()
-	return nil
+	return a.ruleEngine.SaveRules()
 }
 
 func (a *App) DeleteRule(portNum int) error {
@@ -80,8 +88,7 @@ func (a *App) DeleteRule(portNum int) error {
 	defer a.ruleEngine.mutex.Unlock()
 
 	delete(a.ruleEngine.rules, portNum)
-	a.ruleEngine.SaveRules()
-	return nil
+	return a.ruleEngine.SaveRules()
 }
 
 func (a *App) GetRules() map[int]PortRule {
@@ -90,7 +97,7 @@ func (a *App) GetRules() map[int]PortRule {
 	}
 	a.ruleEngine.mutex.Lock()
 	defer a.ruleEngine.mutex.Unlock()
-	
+
 	// Create a copy to return
 	rulesCopy := make(map[int]PortRule)
 	for k, v := range a.ruleEngine.rules {
@@ -101,8 +108,15 @@ func (a *App) GetRules() map[int]PortRule {
 
 func (re *RuleEngine) StartWatcher() {
 	inspector := port.NewInspector()
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(3 * time.Second)
+		select {
+		case <-re.stop:
+			return
+		case <-ticker.C:
+		}
 
 		re.mutex.Lock()
 		rulesCopy := make(map[int]PortRule)
@@ -137,7 +151,7 @@ func (re *RuleEngine) StartWatcher() {
 						if !strings.EqualFold(details.Name, rule.AllowedProcess) && rule.AllowedProcess != "*" {
 							// Unauthorized process! Kill it!
 							fmt.Printf("RuleEngine: Killing unauthorized process %s on port %d\n", details.Name, portNum)
-							re.app.KillPort(portNum)
+							re.app.killPort(portNum, false)
 						}
 					}
 				}
@@ -152,22 +166,27 @@ func (re *RuleEngine) StartWatcher() {
 
 					if cooldownPassed {
 						fmt.Printf("RuleEngine: Auto-healing port %d with cmd: %s\n", portNum, rule.AutoHealCmd)
-						re.mutex.Lock()
-						re.healCooldowns[portNum] = time.Now()
-						re.mutex.Unlock()
-
-						// Spawn command
 						parts := strings.Fields(rule.AutoHealCmd)
 						if len(parts) > 0 {
 							cmd := exec.Command(parts[0], parts[1:]...)
 							if rule.AutoHealDir != "" {
 								cmd.Dir = rule.AutoHealDir
 							}
-							cmd.Start() // Fire and forget
+							if err := cmd.Start(); err == nil {
+								re.mutex.Lock()
+								re.healCooldowns[portNum] = time.Now()
+								re.mutex.Unlock()
+							}
 						}
 					}
 				}
 			}
 		}
 	}
+}
+
+func (re *RuleEngine) Stop() {
+	re.stopOnce.Do(func() {
+		close(re.stop)
+	})
 }

@@ -66,4 +66,3 @@ var scanCmd = &cobra.Command{
 	},
 	SilenceUsage: true,
 }
-

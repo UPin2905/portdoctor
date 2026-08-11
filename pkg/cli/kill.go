@@ -95,4 +95,3 @@ func killPlatform(pid int) error {
 	}
 	return killUnix(pid)
 }
-

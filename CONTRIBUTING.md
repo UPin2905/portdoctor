@@ -20,6 +20,16 @@ go build ./cmd/portdoctor
 go test ./...
 ```
 
+For the Windows desktop application:
+
+```bash
+cd portdoctor-ui
+go test ./...
+cd frontend
+npm ci
+npm run build
+```
+
 ## Before submitting
 
 ```bash
@@ -33,11 +43,11 @@ All four commands must succeed.
 
 ## Adding a framework detector
 
-Edit `internal/framework/detect.go`. Add pattern matching for the new framework and a corresponding test in `detect_test.go`.
+Edit `pkg/framework/detect.go`. Add pattern matching for the new framework and a corresponding test in `pkg/framework/detect_test.go`.
 
 ## Adding an OS
 
-Create `internal/port/port_<os>.go` and `internal/process/process_<os>.go` with the appropriate build tags.
+Create `pkg/port/port_<os>.go` and `pkg/process/process_<os>.go` with the appropriate build tags.
 
 ## Code style
 
@@ -52,4 +62,3 @@ Create `internal/port/port_<os>.go` and `internal/process/process_<os>.go` with 
 - Keep changes focused
 - Include tests for new logic
 - Update documentation if needed
-

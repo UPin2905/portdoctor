@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -24,9 +26,14 @@ import (
 // App struct
 type App struct {
 	ctx           context.Context
-	sharedTunnels map[int]*exec.Cmd
+	sharedTunnels map[int]sharedTunnel
 	tunnelMutex   sync.Mutex
 	ruleEngine    *RuleEngine
+}
+
+type sharedTunnel struct {
+	command *exec.Cmd
+	url     string
 }
 
 // UIPortInfo extends port.PortInfo with UI-specific fields
@@ -44,7 +51,7 @@ type UIPortInfo struct {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	a := &App{
-		sharedTunnels: make(map[int]*exec.Cmd),
+		sharedTunnels: make(map[int]sharedTunnel),
 	}
 	a.ruleEngine = NewRuleEngine(a)
 	return a
@@ -54,6 +61,23 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+}
+
+func (a *App) shutdown(context.Context) {
+	if a.ruleEngine != nil {
+		a.ruleEngine.Stop()
+	}
+
+	a.tunnelMutex.Lock()
+	defer a.tunnelMutex.Unlock()
+
+	for portNum, tunnel := range a.sharedTunnels {
+		if tunnel.command.Process != nil {
+			tunnel.command.Process.Kill()
+		}
+		delete(a.sharedTunnels, portNum)
+	}
+	stopAllProxies()
 }
 
 // ScanPorts returns all listening ports with process names and advanced stats
@@ -111,11 +135,11 @@ func (a *App) ScanPorts() ([]UIPortInfo, error) {
 		}
 
 		a.tunnelMutex.Lock()
-		if _, exists := a.sharedTunnels[p.Port]; exists {
-			uiInfo.SharedURL = "Shared" // We can just set a flag, or we could track the actual URL in a separate map.
+		if tunnel, exists := a.sharedTunnels[p.Port]; exists {
+			uiInfo.SharedURL = tunnel.url
 		}
 		a.tunnelMutex.Unlock()
-		
+
 		results = append(results, uiInfo)
 	}
 
@@ -125,7 +149,7 @@ func (a *App) ScanPorts() ([]UIPortInfo, error) {
 // getProcessNames efficiently fetches names for a list of PIDs
 func (a *App) getProcessNames(pids []int) map[int]string {
 	names := make(map[int]string)
-	
+
 	if runtime.GOOS == "windows" {
 		snapshot, err := syscall.CreateToolhelp32Snapshot(syscall.TH32CS_SNAPPROCESS, 0)
 		if err != nil {
@@ -178,7 +202,11 @@ func (a *App) InspectPort(p int) (*port.PortInfo, error) {
 
 // KillPort kills the process using a specific port
 func (a *App) KillPort(p int) error {
-	if a.ruleEngine != nil {
+	return a.killPort(p, true)
+}
+
+func (a *App) killPort(p int, respectProtection bool) error {
+	if respectProtection && a.ruleEngine != nil {
 		a.ruleEngine.mutex.Lock()
 		if rule, exists := a.ruleEngine.rules[p]; exists && rule.Protected {
 			a.ruleEngine.mutex.Unlock()
@@ -205,7 +233,7 @@ func (a *App) KillPort(p int) error {
 		}
 		return nil
 	}
-	
+
 	cmd := exec.Command("kill", "-9", fmt.Sprintf("%d", info.PID))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -228,6 +256,18 @@ func (a *App) FindFreePort(base int) (int, error) {
 
 // SharePort exposes the port to the internet via localhost.run
 func (a *App) SharePort(portNum int) (string, error) {
+	if err := port.ValidatePort(portNum); err != nil {
+		return "", err
+	}
+
+	info, err := port.NewInspector().Inspect(portNum)
+	if err != nil {
+		return "", err
+	}
+	if info.PID <= 0 {
+		return "", fmt.Errorf("no process found on port %d", portNum)
+	}
+
 	a.tunnelMutex.Lock()
 	defer a.tunnelMutex.Unlock()
 
@@ -235,10 +275,14 @@ func (a *App) SharePort(portNum int) (string, error) {
 		return "", fmt.Errorf("port %d is already being shared", portNum)
 	}
 
-	cmd := exec.Command("ssh", "-R", fmt.Sprintf("80:localhost:%d", portNum), "nokey@localhost.run", "-T", "-o", "StrictHostKeyChecking=no")
+	cmd := exec.Command("ssh", "-R", fmt.Sprintf("80:localhost:%d", portNum), "nokey@localhost.run", "-T", "-o", "StrictHostKeyChecking=accept-new")
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 
 	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return "", err
 	}
@@ -247,36 +291,40 @@ func (a *App) SharePort(portNum int) (string, error) {
 		return "", err
 	}
 
-	// Read from stdout to find the assigned URL
-	urlChan := make(chan string)
-	errChan := make(chan error)
-
-	go func() {
-		scanner := bufio.NewScanner(stdout)
+	lines := make(chan string, 32)
+	readOutput := func(reader io.Reader) {
+		scanner := bufio.NewScanner(reader)
 		for scanner.Scan() {
-			line := scanner.Text()
-			// Expected format: "ddb2150fcd0a93.lhr.life tunneled with tls termination, https://ddb2150fcd0a93.lhr.life"
-			if strings.Contains(line, "tunneled with tls termination") {
-				parts := strings.Fields(line)
-				if len(parts) > 0 {
-					urlChan <- parts[0]
-					return
-				}
-			}
+			lines <- scanner.Text()
 		}
-		errChan <- fmt.Errorf("failed to extract URL from tunnel output")
+	}
+	go readOutput(stdout)
+	go readOutput(stderr)
+	waitCh := make(chan error, 1)
+	go func() {
+		waitCh <- cmd.Wait()
 	}()
 
-	select {
-	case url := <-urlChan:
-		a.sharedTunnels[portNum] = cmd
-		return "https://" + url, nil
-	case err := <-errChan:
-		cmd.Process.Kill()
-		return "", err
-	case <-time.After(15 * time.Second):
-		cmd.Process.Kill()
-		return "", fmt.Errorf("timeout waiting for tunnel URL")
+	urlPattern := regexp.MustCompile(`https://[^\s]+`)
+	timeout := time.NewTimer(15 * time.Second)
+	defer timeout.Stop()
+	for {
+		select {
+		case line := <-lines:
+			url := urlPattern.FindString(line)
+			if url != "" {
+				a.sharedTunnels[portNum] = sharedTunnel{command: cmd, url: url}
+				return url, nil
+			}
+		case err := <-waitCh:
+			if err != nil {
+				return "", fmt.Errorf("tunnel exited before providing a URL: %w", err)
+			}
+			return "", fmt.Errorf("tunnel exited before providing a URL")
+		case <-timeout.C:
+			cmd.Process.Kill()
+			return "", fmt.Errorf("timeout waiting for tunnel URL")
+		}
 	}
 }
 
@@ -285,13 +333,13 @@ func (a *App) StopSharePort(portNum int) error {
 	a.tunnelMutex.Lock()
 	defer a.tunnelMutex.Unlock()
 
-	cmd, exists := a.sharedTunnels[portNum]
+	tunnel, exists := a.sharedTunnels[portNum]
 	if !exists {
 		return fmt.Errorf("port %d is not shared", portNum)
 	}
 
-	if cmd.Process != nil {
-		cmd.Process.Kill()
+	if tunnel.command.Process != nil {
+		tunnel.command.Process.Kill()
 	}
 	delete(a.sharedTunnels, portNum)
 	return nil
@@ -332,9 +380,19 @@ func (a *App) GetProcessDetails(pid int) (*ProcessDetails, error) {
 	for _, e := range env {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 {
-			details.EnvVars[parts[0]] = parts[1]
+			details.EnvVars[parts[0]] = redactEnvironmentValue(parts[0], parts[1])
 		}
 	}
 
 	return details, nil
+}
+
+func redactEnvironmentValue(key, value string) string {
+	normalized := strings.ToUpper(key)
+	for _, marker := range []string{"PASSWORD", "SECRET", "TOKEN", "API_KEY", "APIKEY", "CREDENTIAL", "PRIVATE_KEY"} {
+		if strings.Contains(normalized, marker) {
+			return "[REDACTED]"
+		}
+	}
+	return value
 }

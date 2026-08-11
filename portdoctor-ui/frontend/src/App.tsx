@@ -51,11 +51,23 @@ function App() {
   };
 
   const handleStartProxy = async (port: number) => {
+    if (inspectingPort) return;
     try {
       const proxyPort = await StartProxy(port);
       setInspectingPort({ port, proxyPort });
     } catch (err: any) {
       alert("Error starting traffic inspector: " + err);
+    }
+  };
+
+  const handleStopProxy = async () => {
+    if (!inspectingPort) return;
+    try {
+      await StopProxy(inspectingPort.port);
+    } catch (err: any) {
+      alert("Error stopping traffic inspector: " + err);
+    } finally {
+      setInspectingPort(null);
     }
   };
 
@@ -90,6 +102,7 @@ function App() {
   };
 
   const handleShare = async (p: number) => {
+    if (!window.confirm(`Sharing port ${p} exposes its local service through localhost.run. Do not share services containing sensitive data.`)) return;
     setSharing(prev => ({...prev, [p]: true}));
     try {
       await SharePort(p);
@@ -149,6 +162,7 @@ function App() {
             </button>
             <button
               onClick={loadPorts}
+              disabled={loading}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center shadow-lg shadow-blue-500/30"
             >
               {loading ? 'Scanning...' : '🔄 Refresh'}
@@ -273,7 +287,8 @@ function App() {
                           <div className="flex items-center justify-end gap-2 flex-wrap max-w-[300px]">
                             <button
                               onClick={() => handleStartProxy(p.port)}
-                              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-md transition-all border border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] text-xs font-medium"
+                              disabled={inspectingPort !== null}
+                              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-md transition-all border border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Inspect
                             </button>
@@ -354,10 +369,7 @@ function App() {
         <TrafficInspectorModal 
           port={inspectingPort.port} 
           proxyPort={inspectingPort.proxyPort} 
-          onClose={() => {
-            StopProxy(inspectingPort.port);
-            setInspectingPort(null);
-          }} 
+          onClose={() => { void handleStopProxy(); }}
         />
       )}
 

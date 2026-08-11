@@ -1,5 +1,9 @@
 # PortDoctor
 
+[![CI](https://github.com/UPin2905/portdoctor/actions/workflows/ci.yml/badge.svg)](https://github.com/UPin2905/portdoctor/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/UPin2905/portdoctor)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/UPin2905/portdoctor?display_name=tag)](https://github.com/UPin2905/portdoctor/releases)
+
 > Diagnose local port conflicts without the detective work.
 
 Your dev server says port 3000 is already in use. Instead of hunting through `netstat`, `lsof`, Task Manager, Docker and process trees — just run:
@@ -9,6 +13,8 @@ portdoctor 3000
 ```
 
 PortDoctor tells you **what owns the port**, where it came from, and what you can safely do about it.
+
+Port inspection, scanning, and traffic inspection run locally with no telemetry. The optional Share action intentionally exposes one selected local port through the third-party `localhost.run` tunnel service.
 
 ---
 
@@ -61,6 +67,25 @@ go build -o portdoctor ./cmd/portdoctor
 ### Pre-built binaries
 
 Download from [Releases](https://github.com/UPin2905/portdoctor/releases).
+
+Each release includes CLI binaries for Windows, Linux, and macOS plus SHA-256 checksums.
+
+### Windows desktop app
+
+The repository also includes a Windows desktop interface built with Wails and React. To run it from source:
+
+```bash
+cd portdoctor-ui
+wails dev
+```
+
+To build the frontend independently:
+
+```bash
+cd portdoctor-ui/frontend
+npm ci
+npm run build
+```
 
 ---
 
@@ -137,6 +162,8 @@ No AI. No cloud. No telemetry. Your process information never leaves your comput
 - v0.3.0 — Docker / Podman / WSL detection
 - v0.4.0 — `portdoctor watch`
 
+See [CHANGELOG.md](CHANGELOG.md) for changes in progress.
+
 ---
 
 ## Contributing
@@ -145,9 +172,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Good beginner areas: framework detection, runtime detection, OS compatibility, tests, documentation.
 
+For bug reports, feature requests, and support, see [SUPPORT.md](SUPPORT.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for private vulnerability reporting, local data handling, and the Share feature's network boundary.
+
 ---
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-

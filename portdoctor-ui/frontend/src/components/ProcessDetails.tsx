@@ -60,6 +60,7 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsProps> = ({ details, on
                                 {Object.keys(details.envVars || {}).length} vars
                             </span>
                         </h3>
+                        <p className="text-xs text-amber-300 mb-3">Sensitive environment values are redacted. Command-line arguments may still contain private data.</p>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm border-collapse">
                                 <thead>
