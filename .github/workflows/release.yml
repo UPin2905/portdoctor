@@ -31,14 +31,18 @@ jobs:
             local goos="$1"
             local goarch="$2"
             local extension="${3:-}"
-            local output="dist/portdoctor-${goos}-${goarch}${extension}"
-            GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags "-s -w -X github.com/UPin2905/portdoctor/pkg/cli.version=$version" -o "$output" ./cmd/portdoctor
+            local directory="portdoctor-${goos}-${goarch}"
+            local binary="portdoctor${extension}"
+            mkdir -p "dist/${directory}"
+            GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags "-s -w -X github.com/UPin2905/portdoctor/pkg/cli.version=$version" -o "dist/${directory}/${binary}" ./cmd/portdoctor
+            (cd dist && zip -qr "${directory}.zip" "$directory")
+            rm -rf "dist/${directory}"
           }
           build linux amd64
           build darwin amd64
           build darwin arm64
           build windows amd64 .exe
-          (cd dist && sha256sum * > checksums.txt)
+          (cd dist && sha256sum *.zip > checksums.txt)
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

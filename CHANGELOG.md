@@ -2,6 +2,12 @@
 
 All notable changes to PortDoctor are documented here.
 
+## v0.1.2 - 2026-08-11
+
+### Changed
+
+- Package each release binary as a ZIP archive.
+
 ## v0.1.1 - 2026-08-11
 
 ### Fixed
