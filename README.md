@@ -54,14 +54,64 @@ Suggested actions
 
 ---
 
-## Installation
+## Quick Start
 
-### From source
+### CLI
+
+```bash
+git clone https://github.com/UPin2905/portdoctor.git
+cd portdoctor
+go run ./cmd/portdoctor scan
+```
+
+### Windows desktop app
+
+The desktop app is supported on Windows 10/11. Install the prerequisites below, then run:
+
+```powershell
+git clone https://github.com/UPin2905/portdoctor.git
+cd portdoctor\portdoctor-ui\frontend
+npm ci
+cd ..
+wails doctor
+wails dev
+```
+
+`wails doctor` must report that WebView2 is installed before starting the app. Windows 11 normally includes it; install it if the check reports it missing.
+
+## Prerequisites
+
+| Component | CLI | Windows desktop app |
+|-----------|:---:|:-------------------:|
+| Go 1.26.5 | Required | Required |
+| Node.js 22 | — | Required |
+| Wails CLI 2.13.0 | — | Required |
+| Microsoft WebView2 Runtime | — | Required |
+
+Install the Wails CLI after Go, then reopen your terminal if `wails` is not found:
+
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+```
+
+Run `wails doctor` to verify the Windows desktop prerequisites. See the [Wails installation guide](https://wails.io/docs/v2.12.0/gettingstarted/installation/) for WebView2 and platform setup details.
+
+## Build from Source
+
+### CLI
+
+```powershell
+git clone https://github.com/UPin2905/portdoctor
+cd portdoctor
+go build -o portdoctor.exe ./cmd/portdoctor
+.\portdoctor.exe scan
+```
 
 ```bash
 git clone https://github.com/UPin2905/portdoctor
 cd portdoctor
 go build -o portdoctor ./cmd/portdoctor
+./portdoctor scan
 ```
 
 ### Pre-built binaries
@@ -72,14 +122,16 @@ Each release includes CLI binaries for Windows, Linux, and macOS plus SHA-256 ch
 
 ### Windows desktop app
 
-The repository also includes a Windows desktop interface built with Wails and React. To run it from source:
+Build a production executable after installing the prerequisites:
 
-```bash
+```powershell
 cd portdoctor-ui
-wails dev
+wails build
 ```
 
-To build the frontend independently:
+The executable is written to `portdoctor-ui/build/bin/portdoctor-ui.exe`.
+
+To build only the frontend:
 
 ```bash
 cd portdoctor-ui/frontend
