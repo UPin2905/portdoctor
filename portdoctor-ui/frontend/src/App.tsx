@@ -5,6 +5,7 @@ import { ProcessDetailsModal } from './components/ProcessDetails';
 import { TrafficInspectorModal } from './components/TrafficInspector';
 import { RuleConfigModal } from './components/RuleConfig';
 import { HelpGuideModal } from './components/HelpGuide';
+import { ClipboardSetText } from '../wailsjs/runtime/runtime';
 
 function App() {
   const [ports, setPorts] = useState<main.UIPortInfo[]>([]);
@@ -13,6 +14,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [sharing, setSharing] = useState<Record<number, boolean>>({});
+  const [copied, setCopied] = useState(false);
   
   // Modals state
   const [showHelpGuide, setShowHelpGuide] = useState(false);
@@ -123,6 +125,36 @@ function App() {
     }
   };
 
+  const handleCopyReport = async () => {
+    const report = [
+      'PortDoctor diagnostics',
+      `Generated: ${new Date().toLocaleString()}`,
+      `Listening ports: ${ports.length}`,
+      '',
+      'Port\tStatus\tProcess\tPID\tProject\tCPU\tRAM\tShared URL',
+      ...ports.map((p) => [
+        p.port,
+        p.status || 'UNKNOWN',
+        p.processName || '-',
+        p.pid > 0 ? p.pid : '-',
+        p.project || '-',
+        formatCPU(p.cpu),
+        formatMem(p.ram),
+        p.sharedUrl || '-',
+      ].join('\t')),
+    ].join('\n');
+
+    try {
+      if (!await ClipboardSetText(report)) {
+        throw new Error('Clipboard is unavailable');
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (err: any) {
+      alert('Error copying diagnostics: ' + err);
+    }
+  };
+
   const formatMem = (bytes: number) => {
     if (!bytes) return '-';
     return (bytes / 1024 / 1024).toFixed(1) + ' MB';
@@ -154,6 +186,13 @@ function App() {
             <p className="text-gray-400 mt-2">Visual Port Management Interface</p>
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={handleCopyReport}
+              disabled={loading || ports.length === 0}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors flex items-center gap-2 border border-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {copied ? 'Copied!' : 'Copy report'}
+            </button>
             <button
               onClick={() => setShowHelpGuide(true)}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors flex items-center gap-2 border border-gray-600"
