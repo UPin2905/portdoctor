@@ -15,6 +15,7 @@ function App() {
   const [error, setError] = useState('');
   const [sharing, setSharing] = useState<Record<number, boolean>>({});
   const [copied, setCopied] = useState(false);
+  const [copiedSharePort, setCopiedSharePort] = useState<number | null>(null);
   
   // Modals state
   const [showHelpGuide, setShowHelpGuide] = useState(false);
@@ -152,6 +153,18 @@ function App() {
       window.setTimeout(() => setCopied(false), 2000);
     } catch (err: any) {
       alert('Error copying diagnostics: ' + err);
+    }
+  };
+
+  const handleCopyShareUrl = async (port: number, url: string) => {
+    try {
+      if (!await ClipboardSetText(url)) {
+        throw new Error('Clipboard is unavailable');
+      }
+      setCopiedSharePort(port);
+      window.setTimeout(() => setCopiedSharePort((current) => current === port ? null : current), 2000);
+    } catch (err: any) {
+      alert('Error copying shared URL: ' + err);
     }
   };
 
@@ -348,6 +361,12 @@ function App() {
                                 <a href={p.sharedUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2">
                                   {p.sharedUrl.replace('https://', '')}
                                 </a>
+                                <button
+                                  onClick={() => handleCopyShareUrl(p.port, p.sharedUrl)}
+                                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md transition-all border border-gray-600 text-xs font-medium"
+                                >
+                                  {copiedSharePort === p.port ? 'Copied!' : 'Copy URL'}
+                                </button>
                                 <button
                                   onClick={() => handleStopShare(p.port)}
                                   className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white rounded-md transition-all border border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.5)] text-xs font-medium"
